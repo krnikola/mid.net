@@ -1,6 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using AbySalto.Mid.Infrastructure.Persistence;
+﻿using AbySalto.Mid.Infrastructure.Persistence;
 using AbySalto.Mid.WebApi.Features.Auth;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace AbySalto.Mid.Controllers;
 
@@ -9,10 +14,12 @@ namespace AbySalto.Mid.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly IConfiguration _configuration;
 
-    public AuthController(AppDbContext context)
+    public AuthController(AppDbContext context, IConfiguration configuration)
     {
         _context = context;
+        _configuration = configuration;
     }
 
     [HttpPost("register")]
@@ -41,6 +48,39 @@ public class AuthController : ControllerBase
         if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             return Unauthorized("Invalid credentials.");
 
-        return Ok("Login successful.");
+        var token = GenerateJwtToken(user.Id, user.Email);
+        return Ok(new { token });
+    }
+
+    [Authorize]
+    [HttpGet("me")]
+    public IActionResult Me()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var email = User.FindFirstValue(ClaimTypes.Email);
+
+        return Ok(new { userId, email });
+    }
+
+    private string GenerateJwtToken(int userId, string email)
+    {
+        var jwtSection = _configuration.GetSection("Jwt");
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSection["Key"]!));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+            new Claim(ClaimTypes.Email, email)
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: jwtSection["Issuer"],
+            audience: jwtSection["Audience"],
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(int.Parse(jwtSection["ExpiresMinutes"] ?? "60")),
+            signingCredentials: creds);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
