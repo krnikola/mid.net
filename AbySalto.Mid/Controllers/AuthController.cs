@@ -24,7 +24,7 @@ public class AuthController : ControllerBase
         var user = new User
         {
             Email = request.Email,
-            PasswordHash = request.Password // za sada prazno, kasnije hash
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password)
         };
 
         _context.Users.Add(user);
@@ -36,10 +36,9 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public IActionResult Login(LoginRequest request)
     {
-        var user = _context.Users
-            .FirstOrDefault(u => u.Email == request.Email && u.PasswordHash == request.Password);
+        var user = _context.Users.FirstOrDefault(u => u.Email == request.Email);
 
-        if (user == null)
+        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             return Unauthorized("Invalid credentials.");
 
         return Ok("Login successful.");
