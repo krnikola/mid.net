@@ -1,7 +1,9 @@
-﻿using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.EntityFrameworkCore;
+﻿using AbySalto.Mid.Infrastructure.External.DummyJson;
 using AbySalto.Mid.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http;
 
 namespace AbySalto.Mid.Infrastructure
 {
@@ -19,9 +21,17 @@ namespace AbySalto.Mid.Infrastructure
         private static IServiceCollection AddServices(this IServiceCollection services)
         {
             //   kasnije dodati:
-            // - DummyJsonProductsClient (HttpClient)
             // - repozitorije
             // - caching
+
+            // - DummyJsonProductsClient (HttpClient)
+            services.AddHttpClient<DummyJsonProductClient>(client =>
+            {
+                client.BaseAddress = new Uri("https://dummyjson.com/");
+                client.Timeout = TimeSpan.FromSeconds(20);
+            });
+
+
             return services;
         }
 
