@@ -3,6 +3,7 @@ using AbySalto.Mid.WebApi.Features.Basket;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using AbySalto.Mid.Infrastructure.External.DummyJson;
 
 namespace AbySalto.Mid.Controllers;
 
@@ -12,10 +13,12 @@ namespace AbySalto.Mid.Controllers;
 public class BasketController : ControllerBase
 {
     private readonly BasketStore _basketStore;
+    private readonly DummyJsonProductClient _productClient;
 
-    public BasketController(BasketStore basketStore)
+    public BasketController(BasketStore basketStore, DummyJsonProductClient productClient)
     {
         _basketStore = basketStore;
+        _productClient = productClient;
     }
 
     [HttpPost("items")]
@@ -45,7 +48,21 @@ public class BasketController : ControllerBase
 
         var items = await _basketStore.GetItemsAsync(userId);
 
-        var response = items.Select(i => new { productId = i.ProductId, quantity = i.Quantity });
-        return Ok(response);
+        var tasks = items.Select(async i =>
+        {
+            try
+            {
+                var product = await _productClient.GetProductAsync(i.ProductId);
+                return new { product, quantity = i.Quantity };
+            }
+            catch
+            {
+                return new { product = (ProductDto?)null, quantity = i.Quantity };
+            }
+        });
+
+        var result = await Task.WhenAll(tasks);
+
+        return Ok(result.Where(x => x.product != null));
     }
 }
