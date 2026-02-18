@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
+using AbySalto.Mid.Infrastructure.Services.Stores;
 
 namespace AbySalto.Mid.Infrastructure
 {
@@ -20,10 +21,6 @@ namespace AbySalto.Mid.Infrastructure
 
         private static IServiceCollection AddServices(this IServiceCollection services)
         {
-            //   kasnije dodati:
-            // - repozitorije
-            // - caching
-
             // - DummyJsonProductsClient (HttpClient)
             services.AddHttpClient<DummyJsonProductClient>(client =>
             {
@@ -31,6 +28,8 @@ namespace AbySalto.Mid.Infrastructure
                 client.Timeout = TimeSpan.FromSeconds(20);
             });
 
+            services.AddScoped<FavoritesStore>();
+            services.AddScoped<BasketStore>();
 
             return services;
         }

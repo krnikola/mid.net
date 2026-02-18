@@ -1,4 +1,4 @@
-﻿using AbySalto.Mid.Infrastructure.Persistence;
+﻿using AbySalto.Mid.Infrastructure.Services.Stores;
 using AbySalto.Mid.WebApi.Features.Basket;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,11 +11,11 @@ namespace AbySalto.Mid.Controllers;
 [Authorize]
 public class BasketController : ControllerBase
 {
-    private readonly AppDbContext _context;
-    
-    public BasketController(AppDbContext context)
+    private readonly BasketStore _basketStore;
+
+    public BasketController(BasketStore basketStore)
     {
-        _context = context;
+        _basketStore = basketStore;
     }
 
     [HttpPost("items")]
@@ -25,25 +25,7 @@ public class BasketController : ControllerBase
 
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        var existing = _context.CartItems.FirstOrDefault(x => x.UserId == userId && x.ProductId == request.ProductId);
-
-        if (existing == null)
-        {
-            _context.CartItems.Add(new CartItem
-            {
-                UserId = userId,
-                ProductId = request.ProductId,
-                Quantity = request.Quantity,
-                UpdatedAt = DateTime.UtcNow
-            });
-        }
-        else
-        {
-            existing.Quantity += request.Quantity;
-            existing.UpdatedAt = DateTime.UtcNow;
-        }
-
-        await _context.SaveChangesAsync();
+        await _basketStore.AddItemAsync(userId, request.ProductId, request.Quantity);
         return Ok("Item added.");
     }
 
@@ -52,25 +34,18 @@ public class BasketController : ControllerBase
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        var item = _context.CartItems.FirstOrDefault(x => x.UserId == userId && x.ProductId == productId);
-        if (item == null) return NotFound();
-
-        _context.CartItems.Remove(item);
-        await _context.SaveChangesAsync();
-
-        return Ok("Item removed.");
+        var removed = await _basketStore.RemoveItemAsync(userId, productId);
+        return removed ? Ok("Item removed.") : NotFound();
     }
 
     [HttpGet]
-    public IActionResult GetBasket()
+    public async Task<IActionResult> GetBasket()
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        var items = _context.CartItems
-            .Where(x => x.UserId == userId)
-            .Select(x => new { x.ProductId, x.Quantity })
-            .ToList();
+        var items = await _basketStore.GetItemsAsync(userId);
 
-        return Ok(items);
+        var response = items.Select(i => new { productId = i.ProductId, quantity = i.Quantity });
+        return Ok(response);
     }
 }

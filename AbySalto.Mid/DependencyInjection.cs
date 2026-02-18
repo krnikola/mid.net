@@ -20,7 +20,7 @@ namespace AbySalto.Mid
                     Scheme = "bearer",
                     BearerFormat = "JWT",
                     In = ParameterLocation.Header,
-                    Description = "Unesi JWT token bez riječi Bearer"
+                    Description = "Ovdje je potrebno zaljepiti sadržaj JWT tokena (bez navodnika) kojeg ispiše login u response-u:"
                 });
 
                 c.AddSecurityRequirement(new OpenApiSecurityRequirement

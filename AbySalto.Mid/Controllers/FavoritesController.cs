@@ -1,8 +1,8 @@
-﻿using AbySalto.Mid.Infrastructure.Persistence;
+﻿using AbySalto.Mid.Infrastructure.External.DummyJson;
+using AbySalto.Mid.Infrastructure.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
-using AbySalto.Mid.Infrastructure.External.DummyJson;
 
 namespace AbySalto.Mid.Controllers;
 
@@ -11,12 +11,12 @@ namespace AbySalto.Mid.Controllers;
 [Authorize]
 public class FavoritesController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly FavoritesStore _favoritesStore;
     private readonly DummyJsonProductClient _productClient;
 
-    public FavoritesController(AppDbContext context, DummyJsonProductClient productClient)
+    public FavoritesController(FavoritesStore favoritesStore, DummyJsonProductClient productClient)
     {
-        _context = context;
+        _favoritesStore = favoritesStore;
         _productClient = productClient;
     }
 
@@ -25,17 +25,18 @@ public class FavoritesController : ControllerBase
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        var exists = _context.Favorites.Any(f => f.UserId == userId && f.ProductId == productId);
-        if (exists) return Ok("Already in favorites.");
-
-        _context.Favorites.Add(new Favorite
+        try
         {
-            UserId = userId,
-            ProductId = productId
-        });
+            var p = await _productClient.GetProductAsync(productId);
+            if (p == null) return NotFound("Product not found.");
+        }
+        catch
+        {
+            return NotFound("Product not found.");
+        }
 
-        await _context.SaveChangesAsync();
-        return Ok("Added to favorites.");
+        var added = await _favoritesStore.AddAsync(userId, productId);
+        return Ok(added ? "Added to favorites." : "Already in favorites.");
     }
 
     [HttpDelete("{productId:int}")]
@@ -43,13 +44,8 @@ public class FavoritesController : ControllerBase
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        var fav = _context.Favorites.FirstOrDefault(f => f.UserId == userId && f.ProductId == productId);
-        if (fav == null) return NotFound();
-
-        _context.Favorites.Remove(fav);
-        await _context.SaveChangesAsync();
-
-        return Ok("Removed from favorites.");
+        var removed = await _favoritesStore.RemoveAsync(userId, productId);
+        return removed ? Ok("Removed from favorites.") : NotFound();
     }
 
     [HttpGet]
@@ -57,21 +53,12 @@ public class FavoritesController : ControllerBase
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        var productIds = _context.Favorites
-            .Where(f => f.UserId == userId)
-            .Select(f => f.ProductId)
-            .ToList();
+        var productIds = await _favoritesStore.GetProductIdsAsync(userId);
 
         var tasks = productIds.Select(async id =>
         {
-            try 
-            { 
-                return await _productClient.GetProductAsync(id); 
-            }
-            catch 
-            { 
-                return null; 
-            }
+            try { return await _productClient.GetProductAsync(id); }
+            catch { return null; }
         });
 
         var results = await Task.WhenAll(tasks);
