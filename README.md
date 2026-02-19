@@ -67,7 +67,9 @@ Passwords hashed using BCrypt.
 
 
 **How to Run**
+
 1️. Clone repository
+
 
 2️. Ensure SQL Server is running
 
@@ -101,7 +103,7 @@ dotnet run --project AbySalto.Mid.WebApi
 
 
 Open Swagger in browser
-httpslocalhostxxxx
+https://localhost:xxxx
 
 
 
