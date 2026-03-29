@@ -1,7 +1,3 @@
-**AbySalto – Technical Assignment**
-
-
-
 Overview
 
 **This project is an ASP.NET Core Web API implementing:**
